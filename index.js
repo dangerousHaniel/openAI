@@ -12,6 +12,8 @@ app.use(express.json());
 app.use("/api/chat", chatRouter);
 
 
+
+
 app.listen(PORT, ()=>{
     console.log("I'm up, brev");
 });

@@ -1,7 +1,7 @@
 const express=require("express");
-const { chat, chatKeywords } = require("../ctrl/chatCtrl");
+const { chat, chatTone, chatTheme, chatTotal } = require("../ctrl/chatCtrl");
 router=express.Router();
 
-router.post("/", [chat, chatKeywords]);
+router.post("/", [chat,[chatTone, chatTheme], chatTotal]);
 
 module.exports=router;

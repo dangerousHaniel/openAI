@@ -3,6 +3,28 @@ const configuration = new Configuration({
     apiKey: process.env.OPENAI_API_KEY
 });
 const openai = new OpenAIApi(configuration);
+const natural = require("natural");
+const stopword = require("stopword");
+// const extractTopKeywords=require("./keywordCtrl");
+
+
+
+const extractTopKeywords = async (text, topN = 10) => {
+
+    const tokens = new natural.WordTokenizer().tokenize(text);
+    const filteredTokens = stopword.removeStopwords(tokens).filter(token => /^[a-z0-9]+$/i.test(token));
+    const frequency = {};
+    filteredTokens.forEach(token => {
+        token = token.toLowerCase();
+        frequency[token] = (frequency[token] || 0) + 1;
+    });
+    const sortedKeywords = Object.entries(frequency)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, topN)
+        .map(entry => entry[0]);
+    return sortedKeywords;
+};
+
 
 
 const chat = (async (req, res, next) => {
@@ -17,7 +39,6 @@ const chat = (async (req, res, next) => {
         let newContentLength = newContent.length;
         req.newContent = newContent;
         req.newContentLength = newContentLength;
-        // res.json([newContent, newContentLength]);
         next();
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -25,24 +46,58 @@ const chat = (async (req, res, next) => {
 });
 
 
-const chatKeywords = async (req, res) => {
-    chatObj = {};
+
+const chatTone = async (req, res, next) => {
     const newContent = req.newContent;
-    const newContentLength = req.newContentLength;
     try {
         const chatCompletion = await openai.createChatCompletion({
             model: "gpt-3.5-turbo",
             messages: [
-                { role: "user", content: `find the top 5 keywords in ${newContent}` },
-                ]
+                { role: "user", content: `What's the tone in ${newContent}.Respond concisely.` },
+            ]
         });
-        // { role: "user", content: `whats the tone of ${newContent}` }
-        const topKeywords = chatCompletion.data?.choices?.[0]?.message?.content || "";
-        // const tone=chatCompletion.data?.choices?.[1]?.message?.content || "";
+        const tone = chatCompletion.data?.choices?.[0]?.message?.content || "";
+        req.tone=await extractTopKeywords(tone);
+        next();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+
+const chatTheme = async (req, res, next) => {
+    const newContent = req.newContent;
+    try {
+        const chatCompletion = await openai.createChatCompletion({
+            model: "gpt-3.5-turbo",
+            messages: [
+                { role: "user", content: `What's the theme in ${newContent}.Respond concisely.` },
+            ]
+        });
+        const theme = chatCompletion.data?.choices?.[0]?.message?.content || "";
+        req.theme=await extractTopKeywords(theme);
+        next();
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+
+
+const chatTotal = async (req, res, next) => {
+    chatObj = {};
+    const newContent = req.newContent;
+    const newContentLength = req.newContentLength;
+    const tone=req.tone;
+    const theme=req.theme;
+    try {
         chatObj.Description = newContent;
         chatObj.Length = newContentLength;
-        chatObj.Keywords = topKeywords;
-        // chatObj.Tone=tone;
+        chatObj.Tone=tone;
+        chatObj.Theme=theme;
+        chatObj.TopKeywords = await extractTopKeywords(newContent);
         res.json(chatObj);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -52,4 +107,4 @@ const chatKeywords = async (req, res) => {
 
 
 
-module.exports = { chat, chatKeywords };
+module.exports = { chat, chatTotal, chatTone, chatTheme };
